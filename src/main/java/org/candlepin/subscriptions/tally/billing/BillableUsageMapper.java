@@ -20,6 +20,7 @@
  */
 package org.candlepin.subscriptions.tally.billing;
 
+import com.redhat.swatch.configuration.registry.SubscriptionDefinition;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Stream;
@@ -41,13 +42,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class BillableUsageMapper {
 
-  private final TagProfile tagProfile;
-
-  @Autowired
-  public BillableUsageMapper(TagProfile tagProfile) {
-    this.tagProfile = tagProfile;
-  }
-
   /**
    * We only want to send snapshot information for PAYG product ids. To prevent duplicate data, we
    * don't want to send snapshots with the Usage or ServiceLevel of "_ANY". We only want to report
@@ -59,7 +53,7 @@ public class BillableUsageMapper {
   protected boolean isSnapshotPAYGEligible(TallySnapshot snapshot) {
     String productId = snapshot.getProductId();
 
-    boolean isApplicableProduct = tagProfile.isProductPAYGEligible(productId);
+    boolean isApplicableProduct = SubscriptionDefinition.isProductPAYGEligible(productId);
 
     boolean isHourlyGranularity = Objects.equals(Granularity.HOURLY, snapshot.getGranularity());
 
