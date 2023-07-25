@@ -20,6 +20,7 @@
  */
 package org.candlepin.subscriptions.tally.billing;
 
+import com.redhat.swatch.configuration.registry.SubscriptionDefinition;
 import com.redhat.swatch.contracts.api.model.Contract;
 import com.redhat.swatch.contracts.api.model.Metric;
 import com.redhat.swatch.contracts.api.resources.DefaultApi;
@@ -123,10 +124,35 @@ public class ContractsController {
 
   private String getContractMetricId(BillingProvider billingProvider, String productId, Uom uom) {
     TallyMeasurement.Uom measurementUom = TallyMeasurement.Uom.fromValue(uom.toString());
+
+    var matchingSub = SubscriptionDefinition.findById(productId);
+
     if (BillingProvider.AWS.equals(billingProvider)) {
-      return tagProfile.awsDimensionForTagAndUom(productId, measurementUom);
+
+      if (matchingSub.isPresent()) {
+
+        //        return tagProfile.awsDimensionForTagAndUom(productId, measurementUom);
+
+        //TODO what to return if there's nothing found
+
+        return matchingSub.get().getMetrics().stream()
+            .filter(metric -> Objects.equals(metric.getAwsDimension(), measurementUom))
+            .findFirst()
+            .get()
+            .getAwsDimension();
+      }
+
     } else if (BillingProvider.RED_HAT.equals(billingProvider)) {
-      return tagProfile.rhmMetricIdForTagAndUom(productId, measurementUom);
+
+      //      return tagProfile.rhmMetricIdForTagAndUom(productId, measurementUom);
+
+      //TODO what to return if there's nothing found
+
+      return matchingSub.get().getMetrics().stream()
+          .filter(metric -> Objects.equals(metric.getRhmMetricId(), measurementUom))
+          .findFirst()
+          .get()
+          .getRhmMetricId();
     }
     return null;
   }
