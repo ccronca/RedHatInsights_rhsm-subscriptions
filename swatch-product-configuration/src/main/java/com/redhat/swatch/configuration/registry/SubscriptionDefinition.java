@@ -57,7 +57,6 @@ public class SubscriptionDefinition {
   private List<String> includedSubscriptions = new ArrayList<>();
 
   private List<Variant> variants = new ArrayList<>();
-  private BillingWindow billingWindow;
   private String serviceType;
   private List<Metric> metrics = new ArrayList<>();
   private Defaults defaults;
