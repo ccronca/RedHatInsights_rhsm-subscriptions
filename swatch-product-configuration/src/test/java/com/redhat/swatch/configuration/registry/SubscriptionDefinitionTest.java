@@ -236,4 +236,14 @@ class SubscriptionDefinitionTest {
 
     assertEquals(expected, actual);
   }
+
+  @Test
+  void testIsProductPAYGEligible() {
+    assertTrue(SubscriptionDefinition.isProductPAYGEligible("basilisk-test"));
+  }
+
+  @Test
+  void testIsProductNotPAYGEligible() {
+    assertFalse(SubscriptionDefinition.isProductPAYGEligible("rhel-for-arm"));
+  }
 }

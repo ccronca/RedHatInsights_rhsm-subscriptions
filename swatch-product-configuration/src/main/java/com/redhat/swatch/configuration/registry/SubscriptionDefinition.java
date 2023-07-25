@@ -172,4 +172,16 @@ public class SubscriptionDefinition {
                     .anyMatch(variant -> variant.getRoles().contains(role)))
         .findFirst();
   }
+
+  public static boolean isProductPAYGEligible(String productTag) {
+    return findById(productTag).map(SubscriptionDefinition::isProductPAYEligible).orElse(false);
+  }
+
+  public boolean isProductPAYEligible() {
+    return this.getMetrics().stream()
+        .anyMatch(
+            metric ->
+                Objects.nonNull(metric.getRhmMetricId())
+                    || Objects.nonNull(metric.getAwsDimension()));
+  }
 }
