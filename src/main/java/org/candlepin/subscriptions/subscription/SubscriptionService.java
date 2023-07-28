@@ -114,6 +114,9 @@ public class SubscriptionService {
   }
 
   public List<Subscription> getSubscriptionsByOrgId(String orgId) {
+
+    log.info("Start fetching data from subscription service api");
+
     var index = 0;
     var pageSize = properties.getPageSize();
     int latestResultCount;
@@ -127,6 +130,8 @@ public class SubscriptionService {
       total.addAll(subscriptionsByOrgId);
       index = index + pageSize;
     } while (latestResultCount == pageSize);
+
+    log.info("End fetching data from subscription service api");
 
     return new ArrayList<>(total);
   }

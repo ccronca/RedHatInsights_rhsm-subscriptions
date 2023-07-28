@@ -32,6 +32,7 @@ import jakarta.ws.rs.core.Response;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -312,6 +313,13 @@ public class SubscriptionSyncController {
   @Transactional
   @Timed("swatch_subscription_reconcile_org")
   public void reconcileSubscriptionsWithSubscriptionService(String orgId, boolean paygOnly) {
+    //    reconcileSubscriptionsWithSubscriptionServiceOld(orgId,paygOnly);
+    reconcileSubscriptionsWithSubscriptionServiceRefactored(orgId, paygOnly);
+  }
+
+  @Transactional
+  @Timed("swatch_subscription_reconcile_org")
+  public void reconcileSubscriptionsWithSubscriptionServiceOld(String orgId, boolean paygOnly) {
     log.info("Syncing subscriptions for orgId={}", orgId);
     Set<String> seenSubscriptionIds = new HashSet<>();
     Map<SubscriptionCompoundId, org.candlepin.subscriptions.db.model.Subscription>
@@ -367,6 +375,74 @@ public class SubscriptionSyncController {
     // anything remaining in the map at this point is stale. Measurements and subscription product
     // ID objects should delete in a cascade.
     subscriptionRepository.deleteAll(recordsToDelete);
+  }
+
+  @Transactional
+  public void reconcileSubscriptionsWithSubscriptionServiceRefactored(
+      String orgId, boolean paygOnly) {
+    log.info("Syncing subscriptions for orgId={}", orgId);
+
+    var allSubsFromService = subscriptionService.getSubscriptionsByOrgId(orgId).stream();
+
+    // Filter out non PAYG subscriptions for faster processing when they are not needed.
+    // Slow processing was causing: https://issues.redhat.com/browse/ENT-5083
+
+    if (paygOnly) {
+      allSubsFromService =
+          allSubsFromService.filter(
+              subscription -> SubscriptionDtoUtil.extractBillingProviderId(subscription) != null);
+    }
+
+    var serviceSubIdToDtoMap =
+        allSubsFromService
+            .filter(this::shouldSyncSub)
+            .collect(
+                Collectors.toMap(
+                    Subscription::getId,
+                    Function.identity(),
+                    (s1, s2) -> {
+                      // If two subscriptions appear in the list under the same id, pick the first
+                      // one to use.
+                      return s1;
+                    }));
+
+    var subEntitiesForDeletion = new ArrayList<>();
+
+    subscriptionRepository
+        .findByOrgId(orgId)
+        .forEach(
+            sub -> {
+              var fromService = serviceSubIdToDtoMap.get(Integer.valueOf(sub.getSubscriptionId()));
+
+              // delete from swatch because it didn't appear in the latest list from the
+              // subscription service, or it's in the denylist
+
+              if (fromService == null
+                  || productDenylist.productIdMatches(
+                      SubscriptionDtoUtil.extractSku(fromService))) {
+                subEntitiesForDeletion.add(sub);
+                return;
+              }
+
+              serviceSubIdToDtoMap.remove(fromService.getId());
+
+              syncSubscription(fromService, Optional.of(sub));
+            });
+
+    // These are additional subs that should be sync'd but weren't previously in the database
+    serviceSubIdToDtoMap.values().forEach(this::syncSubscription);
+
+    if (paygOnly) {
+      // don't clean up stale subs, because PAYG-only sync discards/ignores too much data to
+      // determine what to delete at this point
+      return;
+    }
+
+    if (!subEntitiesForDeletion.isEmpty()) {
+      log.info("Removing {} stale/incorrect subscription records", subEntitiesForDeletion.size());
+    }
+
+    subscriptionRepository.deleteAll(subEntitiesForDeletion);
   }
 
   private boolean shouldSyncSub(Subscription sub) {

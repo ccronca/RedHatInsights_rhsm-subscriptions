@@ -240,4 +240,6 @@ public interface SubscriptionRepository
     return (root, query, builder) ->
         builder.equal(root.get(Subscription_.billingAccountId), billingAccountId);
   }
+
+  Long countByOrgId(String orgId);
 }
