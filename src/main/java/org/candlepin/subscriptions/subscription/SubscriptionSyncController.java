@@ -406,7 +406,8 @@ public class SubscriptionSyncController {
                       return s1;
                     }));
 
-    var subEntitiesForDeletion = new ArrayList<>();
+    List<org.candlepin.subscriptions.db.model.Subscription> subEntitiesForDeletion =
+        new ArrayList<>();
 
     subscriptionRepository
         .findByOrgId(orgId)
