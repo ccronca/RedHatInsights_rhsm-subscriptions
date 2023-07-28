@@ -1,10 +1,22 @@
+DATABASE_HOST: ${clowder.database.hostname:localhost}
+DATABASE_PORT: ${clowder.database.port:5432}
+DATABASE_DATABASE: ${clowder.database.name:benchmarking}
+DATABASE_USERNAME: ${clowder.database.username:rhsm-subscriptions}
+DATABASE_PASSWORD: ${clowder.database.password:rhsm-subscriptions}
+DATABASE_CONNECTION_TIMEOUT_MS: 30000
+DATABASE_MAX_POOL_SIZE: 10
+POSTGRES_STATEMENT_TIMEOUT: 5min
+
 rhsm-subscriptions:
   datasource:
-    url: jdbc:hsqldb:mem:testdb
-    username: ''
-    password: ''
-    driver-class-name: org.hsqldb.jdbc.JDBCDriver
-    platform: hsqldb
+    url: jdbc:postgresql://${DATABASE_HOST}:${DATABASE_PORT}/${DATABASE_DATABASE}?reWriteBatchedInserts=true&stringtype=unspecified&options=-c%20statement_timeout=${POSTGRES_STATEMENT_TIMEOUT}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    platform: postgresql
+    hikari:
+      connection-timeout: ${DATABASE_CONNECTION_TIMEOUT_MS}
+      maximum-pool-size: ${DATABASE_MAX_POOL_SIZE}
   inventory-service.datasource:
     url: jdbc:hsqldb:mem:inventory-testdb
     username: ''
