@@ -319,8 +319,6 @@ class SubscriptionSyncControllerTest {
     verify(subscriptionRepository, times(2)).save(any());
   }
 
-  // TODO
-  // Again failing because of different start dates
   @Test
   void shouldForceSubscriptionSyncForOrgWithSameIdButDifferentStartDates() {
     var dto1 = createDto("234", 3);
@@ -781,7 +779,6 @@ class SubscriptionSyncControllerTest {
     assertFalse(subscriptionsCaptor.getValue().iterator().hasNext());
   }
 
-  // TODO why would we want to do this?
   @Test
   void testShouldKeepRecordsWithSameIdAndDifferentStartDates() {
     var subscription1 = createSubscription("123", "testsku", "456");

@@ -313,7 +313,7 @@ public class SubscriptionSyncController {
   @Transactional
   @Timed("swatch_subscription_reconcile_org")
   public void reconcileSubscriptionsWithSubscriptionService(String orgId, boolean paygOnly) {
-    //    reconcileSubscriptionsWithSubscriptionServiceOld(orgId,paygOnly);
+    //        reconcileSubscriptionsWithSubscriptionServiceOld(orgId,paygOnly);
     reconcileSubscriptionsWithSubscriptionServiceRefactored(orgId, paygOnly);
   }
 
@@ -339,7 +339,8 @@ public class SubscriptionSyncController {
           subs.collect(
               Collectors.toMap(
                   sub -> new SubscriptionCompoundId(sub.getSubscriptionId(), sub.getStartDate()),
-                  Function.identity()));
+                  Function.identity(),
+                  (s1, s2) -> s1));
     }
     subscriptions
         .filter(this::shouldSyncSub)
@@ -398,22 +399,33 @@ public class SubscriptionSyncController {
             .filter(this::shouldSyncSub)
             .collect(
                 Collectors.toMap(
-                    Subscription::getId,
+                    sub -> {
+                      OffsetDateTime startDate =
+                          clock.dateFromMilliseconds(sub.getEffectiveStartDate());
+
+                      return new SubscriptionCompoundId(sub.getId().toString(), startDate);
+                    },
                     Function.identity(),
                     (s1, s2) -> {
-                      // If two subscriptions appear in the list under the same id, pick the first
-                      // one to use.
+                      // If two subscriptions appear in the list w/same ID and start date, use the
+                      // first
                       return s1;
                     }));
 
     List<org.candlepin.subscriptions.db.model.Subscription> subEntitiesForDeletion =
         new ArrayList<>();
 
+    List<String> seenIds = new ArrayList<>();
     subscriptionRepository
         .findByOrgId(orgId)
         .forEach(
             sub -> {
-              var fromService = serviceSubIdToDtoMap.get(Integer.valueOf(sub.getSubscriptionId()));
+              var startDate = sub.getStartDate();
+              var subId = sub.getSubscriptionId();
+
+              var key = new SubscriptionCompoundId(subId, startDate);
+
+              var fromService = serviceSubIdToDtoMap.get(key);
 
               // delete from swatch because it didn't appear in the latest list from the
               // subscription service, or it's in the denylist
@@ -425,9 +437,10 @@ public class SubscriptionSyncController {
                 return;
               }
 
-              serviceSubIdToDtoMap.remove(fromService.getId());
+              seenIds.add(sub.getSubscriptionId());
+              var popped = serviceSubIdToDtoMap.remove(key);
 
-              syncSubscription(fromService, Optional.of(sub));
+              syncSubscription(popped, Optional.of(sub));
             });
 
     // These are additional subs that should be sync'd but weren't previously in the database
@@ -439,11 +452,16 @@ public class SubscriptionSyncController {
       return;
     }
 
-    if (!subEntitiesForDeletion.isEmpty()) {
-      log.info("Removing {} stale/incorrect subscription records", subEntitiesForDeletion.size());
+    var recordsToDelete =
+        subEntitiesForDeletion.stream()
+            .filter(sub -> !seenIds.contains(sub.getSubscriptionId()))
+            .toList();
+
+    if (!recordsToDelete.isEmpty()) {
+      log.info("Removing {} stale/incorrect subscription records", recordsToDelete.size());
     }
 
-    subscriptionRepository.deleteAll(subEntitiesForDeletion);
+    subscriptionRepository.deleteAll(recordsToDelete);
   }
 
   private boolean shouldSyncSub(Subscription sub) {
