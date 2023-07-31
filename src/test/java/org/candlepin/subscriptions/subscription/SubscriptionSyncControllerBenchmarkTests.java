@@ -45,13 +45,20 @@ public class SubscriptionSyncControllerBenchmarkTests {
 
   @Test
   void testOriginal() {
-    subscriptionSyncController.reconcileSubscriptionsWithSubscriptionService(ORG_ID, false);
+    subscriptionSyncController.reconcileSubscriptionsWithSubscriptionServiceOld(ORG_ID, false);
   }
 
   @Test
   void testUpdated() {
 
     subscriptionSyncController.reconcileSubscriptionsWithSubscriptionServiceRefactored(
+        ORG_ID, false);
+  }
+
+  @Test
+  void testWithFlushing() {
+
+    subscriptionSyncController.reconcileSubscriptionsWithSubscriptionServiceRefactoredFlushing(
         ORG_ID, false);
   }
 }

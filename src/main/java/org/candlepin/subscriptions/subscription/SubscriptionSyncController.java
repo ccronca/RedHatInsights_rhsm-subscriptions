@@ -26,6 +26,7 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.core.Response;
@@ -101,6 +102,7 @@ public class SubscriptionSyncController {
   private String syncSubscriptionsTopic;
   private final ObjectMapper objectMapper;
   private final ProductDenylist productDenylist;
+  private final EntityManager entityManager;
 
   @Autowired
   public SubscriptionSyncController(
@@ -119,7 +121,8 @@ public class SubscriptionSyncController {
       ObjectMapper objectMapper,
       @Qualifier("syncSubscriptionTasks") TaskQueueProperties props,
       TagProfile tagProfile,
-      AccountService accountService) {
+      AccountService accountService,
+      EntityManager entityManager) {
     this.subscriptionRepository = subscriptionRepository;
     this.orgRepository = orgRepository;
     this.offeringRepository = offeringRepository;
@@ -135,6 +138,7 @@ public class SubscriptionSyncController {
     this.syncSubscriptionsByOrgKafkaTemplate = syncSubscriptionsByOrgKafkaTemplate;
     this.tagProfile = tagProfile;
     this.accountService = accountService;
+    this.entityManager = entityManager;
   }
 
   @Transactional
@@ -315,6 +319,7 @@ public class SubscriptionSyncController {
   public void reconcileSubscriptionsWithSubscriptionService(String orgId, boolean paygOnly) {
     //        reconcileSubscriptionsWithSubscriptionServiceOld(orgId,paygOnly);
     reconcileSubscriptionsWithSubscriptionServiceRefactored(orgId, paygOnly);
+    //    reconcileSubscriptionsWithSubscriptionServiceRefactoredFlushing(orgId, paygOnly);
   }
 
   @Transactional
@@ -425,7 +430,7 @@ public class SubscriptionSyncController {
 
               var key = new SubscriptionCompoundId(subId, startDate);
 
-              var fromService = serviceSubIdToDtoMap.get(key);
+              var fromService = serviceSubIdToDtoMap.remove(key);
 
               // delete from swatch because it didn't appear in the latest list from the
               // subscription service, or it's in the denylist
@@ -438,13 +443,111 @@ public class SubscriptionSyncController {
               }
 
               seenIds.add(sub.getSubscriptionId());
-              var popped = serviceSubIdToDtoMap.remove(key);
 
-              syncSubscription(popped, Optional.of(sub));
+              syncSubscription(fromService, Optional.of(sub));
             });
 
     // These are additional subs that should be sync'd but weren't previously in the database
-    serviceSubIdToDtoMap.values().forEach(this::syncSubscription);
+    serviceSubIdToDtoMap
+        .values()
+        .forEach(
+            extraSub -> {
+              this.syncSubscription(extraSub, Optional.empty());
+            });
+
+    if (paygOnly) {
+      // don't clean up stale subs, because PAYG-only sync discards/ignores too much data to
+      // determine what to delete at this point
+      return;
+    }
+
+    var recordsToDelete =
+        subEntitiesForDeletion.stream()
+            .filter(sub -> !seenIds.contains(sub.getSubscriptionId()))
+            .toList();
+
+    if (!recordsToDelete.isEmpty()) {
+      log.info("Removing {} stale/incorrect subscription records", recordsToDelete.size());
+    }
+
+    subscriptionRepository.deleteAll(recordsToDelete);
+  }
+
+  @Transactional
+  public void reconcileSubscriptionsWithSubscriptionServiceRefactoredFlushing(
+      String orgId, boolean paygOnly) {
+    log.info("Syncing subscriptions for orgId={}", orgId);
+
+    var allSubsFromService = subscriptionService.getSubscriptionsByOrgId(orgId).stream();
+
+    // Filter out non PAYG subscriptions for faster processing when they are not needed.
+    // Slow processing was causing: https://issues.redhat.com/browse/ENT-5083
+
+    if (paygOnly) {
+      allSubsFromService =
+          allSubsFromService.filter(
+              subscription -> SubscriptionDtoUtil.extractBillingProviderId(subscription) != null);
+    }
+
+    var serviceSubIdToDtoMap =
+        allSubsFromService
+            .filter(this::shouldSyncSub)
+            .collect(
+                Collectors.toMap(
+                    sub -> {
+                      OffsetDateTime startDate =
+                          clock.dateFromMilliseconds(sub.getEffectiveStartDate());
+
+                      return new SubscriptionCompoundId(sub.getId().toString(), startDate);
+                    },
+                    Function.identity(),
+                    (s1, s2) -> {
+                      // If two subscriptions appear in the list w/same ID and start date, use the
+                      // first
+                      return s1;
+                    }));
+
+    List<org.candlepin.subscriptions.db.model.Subscription> subEntitiesForDeletion =
+        new ArrayList<>();
+
+    List<String> seenIds = new ArrayList<>();
+    subscriptionRepository
+        .findByOrgId(orgId)
+        .forEach(
+            sub -> {
+              var startDate = sub.getStartDate();
+              var subId = sub.getSubscriptionId();
+
+              var key = new SubscriptionCompoundId(subId, startDate);
+
+              var fromService = serviceSubIdToDtoMap.remove(key);
+
+              // delete from swatch because it didn't appear in the latest list from the
+              // subscription service, or it's in the denylist
+
+              if (fromService == null
+                  || productDenylist.productIdMatches(
+                      SubscriptionDtoUtil.extractSku(fromService))) {
+                subEntitiesForDeletion.add(sub);
+                return;
+              }
+
+              seenIds.add(sub.getSubscriptionId());
+
+              syncSubscription(fromService, Optional.of(sub));
+              subscriptionRepository.flush();
+              entityManager.clear();
+            });
+
+    // These are additional subs that should be sync'd but weren't previously in the database
+    serviceSubIdToDtoMap
+        .values()
+        .forEach(
+            extraSub -> {
+              this.syncSubscription(extraSub, Optional.empty());
+              subscriptionRepository.flush();
+              entityManager.clear();
+            });
 
     if (paygOnly) {
       // don't clean up stale subs, because PAYG-only sync discards/ignores too much data to
