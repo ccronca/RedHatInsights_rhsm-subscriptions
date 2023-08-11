@@ -416,6 +416,13 @@ public class InventoryAccountUsageCollector {
       Host swatchSystem,
       OrgHostsData orgHostsData,
       Set<String> applicableProducts) {
+
+    // TODO It fixes the problem but probably want to evaluate the impact of doing this.  Maybe we
+    // can refresh in a more targeted way if we know the entity is detached
+    if (swatchSystem != null) {
+      entityManager.refresh(swatchSystem);
+    }
+
     log.debug(
         "Reconciling HBI inventoryId={} & swatch inventoryId={}",
         Optional.ofNullable(hbiSystem).map(InventoryHostFacts::getInventoryId),
@@ -536,6 +543,7 @@ public class InventoryAccountUsageCollector {
       NormalizedFacts normalizedFacts,
       Host host,
       Set<Key> usageKeys) {
+
     populateHostFieldsFromHbi(host, inventoryHostFacts, normalizedFacts);
     applyNonHypervisorBuckets(host, normalizedFacts, usageKeys);
     hostRepository.save(host);
