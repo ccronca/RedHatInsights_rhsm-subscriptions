@@ -148,6 +148,12 @@ parameters:
     value: 'false'
   - name: OTEL_EXPORTER_OTLP_ENDPOINT
     value: 'http://localhost:4317'
+  - name: METRICS_HEALTH_LIVENESS_PATH
+    value: /health/liveness
+  - name: METRICS_HEALTH_READY_PATH
+    value: /health
+  - name: METRICS_HEALTH_PORT
+    value: '9000'
 objects:
   - apiVersion: cloud.redhat.com/v1alpha1
     kind: ClowdApp
@@ -244,6 +250,8 @@ objects:
                 value: ${SPLUNK_HEC_TERMINATION_TIMEOUT}
               - name: SPRING_PROFILES_ACTIVE
                 value: openshift-metering-worker,api,kafka-queue
+              - name: QUARKUS_PROFILE
+                value: openshift-metering-worker
               - name: SERVER_MAX_HTTP_HEADER_SIZE
                 value: ${SERVER_MAX_HTTP_HEADER_SIZE}
               - name: LOG_FILE
@@ -358,8 +366,8 @@ objects:
             livenessProbe:
               failureThreshold: 3
               httpGet:
-                path: /health/liveness
-                port: 9000
+                path: ${METRICS_HEALTH_LIVENESS_PATH}
+                port: ${{METRICS_HEALTH_PORT}}
                 scheme: HTTP
               initialDelaySeconds: 15
               periodSeconds: 20
@@ -368,8 +376,8 @@ objects:
             readinessProbe:
               failureThreshold: 3
               httpGet:
-                path: /health
-                port: 9000
+                path: ${METRICS_HEALTH_READY_PATH}
+                port: ${{METRICS_HEALTH_PORT}}
                 scheme: HTTP
               initialDelaySeconds: 15
               periodSeconds: 20
@@ -538,6 +546,8 @@ objects:
                 value: ${SPLUNK_HEC_TERMINATION_TIMEOUT}
               - name: SPRING_PROFILES_ACTIVE
                 value: metrics-rhel,api,kafka-queue
+              - name: QUARKUS_PROFILE
+                value: metrics-rhel
               - name: SERVER_MAX_HTTP_HEADER_SIZE
                 value: ${SERVER_MAX_HTTP_HEADER_SIZE}
               - name: LOG_FILE
@@ -630,8 +640,8 @@ objects:
             livenessProbe:
               failureThreshold: 3
               httpGet:
-                path: /health/liveness
-                port: 9000
+                path: ${METRICS_HEALTH_LIVENESS_PATH}
+                port: ${{METRICS_HEALTH_PORT}}
                 scheme: HTTP
               initialDelaySeconds: 15
               periodSeconds: 20
@@ -640,8 +650,8 @@ objects:
             readinessProbe:
               failureThreshold: 3
               httpGet:
-                path: /health
-                port: 9000
+                path: ${METRICS_HEALTH_READY_PATH}
+                port: ${{METRICS_HEALTH_PORT}}
                 scheme: HTTP
               initialDelaySeconds: 15
               periodSeconds: 20
