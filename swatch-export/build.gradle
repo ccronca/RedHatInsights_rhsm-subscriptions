@@ -1,0 +1,21 @@
+plugins {
+    id "swatch.java-library-conventions"
+    id "swatch.spring-boot-dependencies-conventions"
+    id "swatch.spring-boot-rest-client-conventions"
+    id 'jsonschema2pojo'
+    id 'org.springframework.boot' apply false
+    id 'io.spring.dependency-management'
+    id 'java'
+}
+
+
+dependencyManagement {
+    imports {
+        mavenBom org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES
+    }
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}

@@ -93,7 +93,8 @@ import org.springframework.util.backoff.FixedBackOff;
       "org.candlepin.subscriptions.event",
       "org.candlepin.subscriptions.inventory.db",
       "org.candlepin.subscriptions.tally",
-      "org.candlepin.subscriptions.retention"
+      "org.candlepin.subscriptions.retention",
+      "com.redhat.swatch.export"
     },
     // Prevent TestConfiguration annotated classes from being picked up by ComponentScan
     excludeFilters = {

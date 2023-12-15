@@ -35,6 +35,7 @@ allprojects {
 dependencies {
     implementation project(":swatch-common-clock")
     implementation project(':swatch-core')
+    implementation project(':swatch-export')
     implementation project(":api")
     implementation project(":clients:rh-marketplace-client")
     implementation project(":clients:product-client")

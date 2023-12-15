@@ -41,7 +41,11 @@ import org.springframework.scheduling.annotation.EnableAsync;
 @EnableAsync
 @Import({ResteasyConfiguration.class, RhsmSubscriptionsDataSourceConfiguration.class})
 @ComponentScan(
-    basePackages = {"org.candlepin.subscriptions.capacity", "org.candlepin.subscriptions.product"},
+    basePackages = {
+      "org.candlepin.subscriptions.capacity",
+      "org.candlepin.subscriptions.product",
+      "com.redhat.swatch.export"
+    },
     // Prevent TestConfiguration annotated classes from being picked up by ComponentScan
     excludeFilters = {
       @ComponentScan.Filter(type = FilterType.CUSTOM, classes = TypeExcludeFilter.class),
