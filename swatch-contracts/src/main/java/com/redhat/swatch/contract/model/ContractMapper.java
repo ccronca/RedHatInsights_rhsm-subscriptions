@@ -77,7 +77,7 @@ public interface ContractMapper {
     if (code.getProductCode() != null) {
       return code.getProductCode();
     } else if (code.getPartner().equals("azure_marketplace")) {
-      return code.getOfferId();
+      return code.getAzureOfferId();
     }
     return null;
   }
@@ -85,9 +85,10 @@ public interface ContractMapper {
   @Named("billingProviderId")
   default String extractBillingProviderId(PartnerEntitlementContractCloudIdentifiers code) {
     String providerId = null;
-    if ("azure_marketplace".equals(code.getPartner())) {
+    if (Objects.equals("azure_marketplace", code.getPartner())) {
       providerId =
-          String.format("%s;%s;%s", code.getAzureResourceId(), code.getPlanId(), code.getOfferId());
+          String.format(
+              "%s;%s;%s", code.getAzureResourceId(), code.getPlanId(), code.getAzureOfferId());
     }
     return providerId;
   }
@@ -151,6 +152,15 @@ public interface ContractMapper {
     } else {
       return null;
     }
+  }
+
+  @Named("rhSubscriptionNumber")
+  default String getRhSubscriptionNumber(List<RhEntitlementV1> rhEntitlements) {
+    return Objects.nonNull(rhEntitlements)
+            && !rhEntitlements.isEmpty()
+            && Objects.nonNull(rhEntitlements.get(0))
+        ? rhEntitlements.get(0).getSubscriptionNumber()
+        : null;
   }
 
   Set<ContractMetricEntity> dimensionV1ToContractMetricEntity(Set<DimensionV1> dimension);

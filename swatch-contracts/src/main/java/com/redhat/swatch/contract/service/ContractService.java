@@ -384,10 +384,9 @@ public class ContractService {
   }
 
   private boolean validAzureEntitlementContract(PartnerEntitlementContract contract) {
-    return Objects.nonNull(contract.getRedHatSubscriptionNumber())
-        && Objects.nonNull(contract.getCloudIdentifiers())
+    return Objects.nonNull(contract.getCloudIdentifiers())
         && Objects.nonNull(contract.getCloudIdentifiers().getAzureResourceId())
-        && Objects.nonNull(contract.getCloudIdentifiers().getOfferId());
+        && Objects.nonNull(contract.getCloudIdentifiers().getAzureOfferId());
   }
 
   private boolean validAwsEntitlementContract(PartnerEntitlementContract contract) {
@@ -575,6 +574,10 @@ public class ContractService {
               .flatMap(contract -> contract.getDimensions().stream())
               .collect(Collectors.toSet());
       entity.setMetrics(mapper.dimensionV1ToContractMetricEntity(dimensionV1s));
+      if (Objects.isNull(entity.getSubscriptionNumber())) {
+        entity.setSubscriptionNumber(
+            mapper.getRhSubscriptionNumber(entitlement.getRhEntitlements()));
+      }
       populateProductIdBySku(entity);
     }
   }
